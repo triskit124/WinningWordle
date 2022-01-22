@@ -77,7 +77,7 @@ def findValidWords(words):
     for word in words:
         candidate = word.replace('\n', '').lower()  # get rid of newline token and convert to lowercase
 
-        if len(candidate) == 5 and candidate.isalpha():
+        if len(candidate) == 5 and candidate.isalpha() and len(set(candidate)) == len(candidate):
             validWords.append(candidate)
 
     return validWords
