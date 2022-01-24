@@ -10,4 +10,4 @@ The rules are simple:
 Words are ranked based on how likely each of their letters are to show up in the English language for each position in the word. 
 
 ## Result
-The best word I found was: **sores**
+The best word I found was: **cares**
