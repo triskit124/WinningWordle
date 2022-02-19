@@ -16,6 +16,8 @@ The rules are simple:
 Words are ranked by WordlBot based on how likely each of their letters are to show up in the English language for each position in the word. Humans can make guesses as they please, but WordleBot will give their best guess to help. 
 
 ## How to play
-If you are a human wishing to have a robotic Wordle advisor, `python3 UserPlay.py`
+To play with an Advisor while playing the real Wordle game, `python3 AdvisorPlay.py`
 
-If you are a robot wishing to play Wordle at lighting speed, `python3 SelfPlay.py`
+To play with an Advisor with a randomized solution, `python3 RandomPlay.py`
+
+To have the Wordle bot play by itself on all possible solutions, `python3 SelfPlay.py`
