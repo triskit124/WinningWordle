@@ -9,18 +9,20 @@ import random
 import string
 
 
-class WordlBot:
+class WordleBot:
 
-    def __init__(self, selfPlay=False):
-        with open('wordledict.txt') as f:
+    def __init__(self, selfPlay=False, advisorMode=False):
+        with open('solutions.txt') as f:
             self.all_words = f.readlines()
 
         self.selfPlay = selfPlay
+        self.advisorMode = advisorMode
         self.numGuesses = 0
         self.gameWon = False
         self.gameLost = False
         self.solution = None
         self.validWords = self.all_words
+        self.lettersInSolution = set()
         self.bestWord = None
         self.wordScores = None
         self.positionalFrequencies = None
@@ -30,7 +32,8 @@ class WordlBot:
         self.hints = [None, None, None, None, None]
 
         self.findValidWords()
-        self.solution = random.choice(self.validWords)
+        if not self.advisorMode:
+            self.solution = random.choice(self.validWords)
 
         # intro sequence
         if not self.selfPlay:
@@ -41,7 +44,7 @@ class WordlBot:
              / /__/  __/ /_(__  )    | |/ |/ / / / / /    | |/ |/ / /_/ / /  / /_/ / /  __/_/\n \
             /_____|___/\__/____/     |__/|__/_/_/ /_/     |__/|__/\____/_/   \__,_/_/\___(_)\n")
 
-            print("     Welcome! Let's play some Wordl \n")
+            print("     Welcome! Let's play some Wordle \n")
 
     def play(self):
         """
@@ -75,11 +78,11 @@ class WordlBot:
         for h in range(len(self.hints)):
             if self.hints[h] is None:
                 guess_str += " _ "
-            elif self.hints[h] == "green":
+            elif self.hints[h] == "g":
                 guess_str += " \u2714 "
-            elif self.hints[h] == "yellow":
+            elif self.hints[h] == "y":
                 guess_str += " * "
-            elif self.hints[h] == "black":
+            elif self.hints[h] == "b":
                 guess_str += " \u2718 "
 
         if self.selfPlay:
@@ -109,31 +112,53 @@ class WordlBot:
     def evaluateGuess(self):
         """
         Evaluates a guess against the solution. Will give out hints for each position in the 5-letter word:
-            "green" : the letter is in the correct place
-            "yellow" : the letter is in the word, but not in this space
-            "black" : this letter is not in the word
+            "g" : the letter is in the correct place
+            "y" : the letter is in the word, but not in this space
+            "b" : this letter is not in the word
         This function then prunes out impossible letters out of self.possibleLetters
         """
 
-        # check to see if the solution has been guessed
-        if self.currentGuess == self.solution:
-            self.gameWon = True
-            return
+        if self.advisorMode:
+            self.hints = input("    Enter the hints given: (g)reen, (y)ellow, (b)lack:  ")
 
-        # look at each letter in guess and compare against solution. Prune possibleLetters accordingly
-        for i in range(len(self.solution)):
-            if self.currentGuess[i] == self.solution[i]:
-                self.hints[i] = "green"
-                self.possibleLetters[i] = self.currentGuess[i]
-            elif self.currentGuess[i] in self.solution:
-                self.hints[i] = "yellow"
-                if self.currentGuess[i] in self.possibleLetters[i]:
-                    self.possibleLetters[i].remove(self.currentGuess[i])
-            else:
-                self.hints[i] = "black"
-                for j in range(5):
-                    if self.currentGuess[i] in self.possibleLetters[j]:
-                        self.possibleLetters[j].remove(self.currentGuess[i])
+            if self.hints == "ggggg":
+                self.gameWon = True
+                return
+
+            for i in range(len(self.hints)):
+                if self.hints[i] == "g":
+                    self.lettersInSolution.add(self.currentGuess[i])
+                    self.possibleLetters[i] = self.currentGuess[i]
+                elif self.hints[i] == "y":
+                    self.lettersInSolution.add(self.currentGuess[i])
+                    if self.currentGuess[i] in self.possibleLetters[i]:
+                        self.possibleLetters[i].remove(self.currentGuess[i])
+                else:
+                    for j in range(5):
+                        if self.currentGuess[i] in self.possibleLetters[j] and len(self.possibleLetters[j]) != 1:
+                            self.possibleLetters[j].remove(self.currentGuess[i])
+        else:
+            # check to see if the solution has been guessed
+            if self.currentGuess == self.solution:
+                self.gameWon = True
+                return
+
+            # look at each letter in guess and compare against solution. Prune possibleLetters accordingly
+            for i in range(len(self.solution)):
+                if self.currentGuess[i] == self.solution[i]:
+                    self.hints[i] = "g"
+                    self.lettersInSolution.add(self.currentGuess[i])
+                    self.possibleLetters[i] = self.currentGuess[i]
+                elif self.currentGuess[i] in self.solution:
+                    self.hints[i] = "y"
+                    self.lettersInSolution.add(self.currentGuess[i])
+                    if self.currentGuess[i] in self.possibleLetters[i]:
+                        self.possibleLetters[i].remove(self.currentGuess[i])
+                else:
+                    self.hints[i] = "b"
+                    for j in range(5):
+                        if self.currentGuess[i] in self.possibleLetters[j] and len(self.possibleLetters[j]) != 1:
+                            self.possibleLetters[j].remove(self.currentGuess[i])
 
     def victory(self):
         """
@@ -187,6 +212,9 @@ class WordlBot:
             for k in self.positionalFrequencies[i].keys():
                 self.normalizedPositionalFrequencies[i][k] = self.positionalFrequencies[i][k] / sum(self.positionalFrequencies[i].values())
 
+    def SetSolution(self, solution):
+        self.solution = solution
+    
     def findValidWords(self):
         """
         Looks through a dictionary of words and weeds out any invalid words according to the current set of possibleLetters
@@ -198,6 +226,7 @@ class WordlBot:
 
             if len(candidate) == 5 and candidate.isalpha():
                 if candidate[0] in self.possibleLetters[0] and candidate[1] in self.possibleLetters[1] and candidate[2] in self.possibleLetters[2] and candidate[3] in self.possibleLetters[3] and candidate[4] in self.possibleLetters[4]:
-                    newValidWords.append(candidate)
+                    if set(self.lettersInSolution).issubset(set(candidate)):
+                        newValidWords.append(candidate)
 
         self.validWords = newValidWords
