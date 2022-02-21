@@ -7,7 +7,7 @@ def main():
     """
 
     wordleBot = WordleBot(selfPlay=False)
-    wordleBot.SetSolution("wrung")
+    #wordleBot.SetSolution("wrung")
     wordleBot.play()
 
 

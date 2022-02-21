@@ -7,13 +7,31 @@ __date__ = "23 Jan 2022"
 
 import random
 import string
+import pickle
 
 
 class WordleBot:
 
     def __init__(self, selfPlay=False, advisorMode=False):
-        with open('solutions.txt') as f:
+
+        # load all allowable words
+        with open('wordledict.txt') as f:
             self.all_words = f.readlines()
+
+        for w, word in enumerate(self.all_words):
+            self.all_words[w] = word.replace('\n', '').lower()
+
+        # load all solution words
+        with open('solutions.txt') as f:
+            self.solution_words = f.readlines()
+
+        for w, word in enumerate(self.solution_words):
+            self.solution_words[w] = word.replace('\n', '').lower()
+
+        # load a dict that maps words to frequencies in the english language
+        f = open("wordFrequencies.pkl", "rb")
+        self.wordFrequencies = pickle.load(f)
+        f.close()
 
         self.selfPlay = selfPlay
         self.advisorMode = advisorMode
@@ -27,13 +45,14 @@ class WordleBot:
         self.wordScores = None
         self.positionalFrequencies = None
         self.normalizedPositionalFrequencies = None
+        self.frequencyWeight = 0.4 # how much to weigh a likely word vs unlikely word when computing score
         self.possibleLetters = [list(string.ascii_lowercase) for _ in range(5)]
         self.currentGuess = None
         self.hints = [None, None, None, None, None]
 
         self.findValidWords()
         if not self.advisorMode:
-            self.solution = random.choice(self.validWords)
+            self.solution = random.choice(self.solution_words)
 
         # intro sequence
         if not self.selfPlay:
@@ -96,7 +115,7 @@ class WordleBot:
 
             self.findMostLikelyWord() # generate a hint for the human player
 
-            print("     A pretty good guess here would be: " + self.bestWord + "\n")
+            print("     Guess " + str(self.numGuesses) + ", a pretty good guess here would be: " + self.bestWord + "\n")
             print("     Press (a) to view all possibilities remaining\n")
             self.currentGuess = input("     What's your guess? ") # get user guess
 
@@ -165,7 +184,7 @@ class WordleBot:
         Handles setting the game state to victory
         """
         if not self.selfPlay:
-            print("Lets go baby!!! \n")
+            print("Lets go baby!!! You won in " + str(self.numGuesses) + " guesses! \n")
 
     def defeat(self):
         """
@@ -186,6 +205,7 @@ class WordleBot:
         # loop through each word in the english language and pick out words of length 5 with no repeating characters
         for word in self.validWords:
             score = sum([self.normalizedPositionalFrequencies[i][word[i]] for i in range(len(word))]) # add up frequency scores from each letter
+            score += self.frequencyWeight * self.wordFrequencies[word] # add score based on how common the word is
             self.wordScores[word] = score # save result in a Dict
 
         # find the best candidate, i.e. the key with the largest value associated with it

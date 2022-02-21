@@ -15,6 +15,9 @@ def main():
     # play each game
     for i, word in enumerate(all_words):
 
+        #if i == 200:
+        #    break
+
         word = word.replace('\n', '').lower()  # get rid of newline token and convert to lowercase
 
         if i % 100 == 0:
