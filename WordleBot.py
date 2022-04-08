@@ -6,13 +6,14 @@ __authors__ = "Tristan Hasseler"
 __date__ = "23 Jan 2022"
 
 import random
+import math
 import string
 import pickle
 
 
 class WordleBot:
 
-    def __init__(self, selfPlay=False, advisorMode=False):
+    def __init__(self, selfPlay=False, randomGuesses=False, advisorMode=False):
 
         # load all allowable words
         with open('wordledict.txt') as f:
@@ -34,10 +35,12 @@ class WordleBot:
         f.close()
 
         self.selfPlay = selfPlay
+        self.randomGuesses = randomGuesses
         self.advisorMode = advisorMode
         self.numGuesses = 0
         self.gameWon = False
         self.gameLost = False
+        self.gameQuit = False
         self.solution = None
         self.validWords = self.all_words
         self.lettersInSolution = set()
@@ -51,6 +54,8 @@ class WordleBot:
         self.hints = [None, None, None, None, None]
 
         self.findValidWords()
+        self.previousValidWordsCount = len(self.validWords)
+
         if not self.advisorMode:
             self.solution = random.choice(self.solution_words)
 
@@ -63,7 +68,7 @@ class WordleBot:
              / /__/  __/ /_(__  )    | |/ |/ / / / / /    | |/ |/ / /_/ / /  / /_/ / /  __/_/\n \
             /_____|___/\__/____/     |__/|__/_/_/ /_/     |__/|__/\____/_/   \__,_/_/\___(_)\n")
 
-            print("     Welcome! Let's play some Wordle \n")
+            print("     Welcome! Let's play some Wordle \n\n")
 
     def play(self):
         """
@@ -74,8 +79,11 @@ class WordleBot:
         """
 
         while not self.gameWon and not self.gameLost:
-            self.findValidWords()
             self.guess()
+
+            if self.gameQuit:
+                break
+
             self.evaluateGuess()
 
         # handle game-over states
@@ -83,6 +91,8 @@ class WordleBot:
             self.victory()
         elif self.gameLost:
             self.defeat()
+        elif self.gameQuit:
+            self.quit()
 
     def guess(self):
         """
@@ -106,26 +116,43 @@ class WordleBot:
 
         if self.selfPlay:
             # if the WordleBot is playing itself, just generate the best guess and submit it
-            self.findMostLikelyWord()
-            self.currentGuess = self.bestWord
+            if self.randomGuesses:
+                self.currentGuess = random.choice(self.validWords)
+            else:
+                self.findMostLikelyWord()
+                self.currentGuess = self.bestWord
         else:
             if self.currentGuess is not None:
-                print("     Your current hints are: " + self.currentGuess[0] + "  " + self.currentGuess[1] + "  " + self.currentGuess[2] + "  " + self.currentGuess[3] + "  " + self.currentGuess[4] + "\n")
+                print("\n     Your current hints are: " + self.currentGuess[0] + "  " + self.currentGuess[1] + "  " + self.currentGuess[2] + "  " + self.currentGuess[3] + "  " + self.currentGuess[4] + "\n")
                 print("                            " + guess_str + "\n")
 
             self.findMostLikelyWord() # generate a hint for the human player
 
-            print("     Guess " + str(self.numGuesses) + ", a pretty good guess here would be: " + self.bestWord + "\n")
-            print("     Press (a) to view all possibilities remaining\n")
-            self.currentGuess = input("     What's your guess? ") # get user guess
+            print("Guess " + str(self.numGuesses))
+            print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+            if self.numGuesses != 1:
+                print("     That last guess reduced our valid guesses by %0.2f%% (%0.2f Bits)\n" % (self.findWordsReductionPercentage(), self.findBitsOfInformation()))
+            print("     Press (h) to get a hint\n")
+            print("     Press (a) to view all " + str(len(self.wordScores.keys())) + " possibilities remaining\n")
+            print("     Press (q) to quit\n\n")
 
-            # print out all valid words if requested
-            if self.currentGuess == "a":
-                print("\n     Valid words remaining are: \n")
-                for validWord in self.validWords:
-                    print("         -" + validWord + "\n")
+            # Ask user to guess and test validity
+            while True:
                 self.currentGuess = input("     What's your guess? ") # get user guess
-
+                if len(self.currentGuess) == 5 and self.currentGuess.isalpha() and self.currentGuess in self.all_words:
+                    break
+                elif self.currentGuess == "h":
+                    print("\n     I'd recommend guessing: " + self.bestWord + "\n")
+                # print out all valid words if requested
+                elif self.currentGuess == "a":
+                    print("\n     Valid words remaining are: \n")
+                    for w in self.wordScores.keys():
+                        print("         -%s (confidence: %0.2f)\n" % (w, self.wordScores[w]))
+                elif self.currentGuess == "q":
+                    self.gameQuit = True
+                    break
+                else:
+                    print("\n     Not a valid guess!\n")
             print("\n\n")
 
     def evaluateGuess(self):
@@ -138,7 +165,15 @@ class WordleBot:
         """
 
         if self.advisorMode:
-            self.hints = input("    Enter the hints given: (g)reen, (y)ellow, (b)lack:  ")
+            while True:
+                self.hints = input("     Enter the hints given: (g)reen, (y)ellow, (b)lack:  ")
+                self.hints = self.hints.lower().replace(" ", "")
+
+                # verify that hints typed are valid
+                if len(self.hints) == 5 and self.hints.isalpha() and set(self.hints).issubset(set(["b", "y", "g"])):
+                    break
+                else:
+                    print("\n     Not a valid hint! Examples: gygby, ggggg, bbbbb, ...\n")
 
             if self.hints == "ggggg":
                 self.gameWon = True
@@ -179,19 +214,28 @@ class WordleBot:
                         if self.currentGuess[i] in self.possibleLetters[j] and len(self.possibleLetters[j]) != 1:
                             self.possibleLetters[j].remove(self.currentGuess[i])
 
+        self.findValidWords()
+
     def victory(self):
         """
         Handles setting the game state to victory
         """
         if not self.selfPlay:
-            print("Lets go baby!!! You won in " + str(self.numGuesses) + " guesses! \n")
+            print("\n\n     Lets go baby!!! You won in " + str(self.numGuesses) + " guesses! \n")
 
     def defeat(self):
         """
         Handles setting the game state to defeat
         """
         if not self.selfPlay:
-            print(" :( \n")
+            print("\n\n:-(")
+
+    def quit(self):
+        """
+        Handles quitting the game early
+        """
+        if not self.selfPlay:
+            print("     See You next time!\n")
 
     def findMostLikelyWord(self):
         """
@@ -207,6 +251,8 @@ class WordleBot:
             score = sum([self.normalizedPositionalFrequencies[i][word[i]] for i in range(len(word))]) # add up frequency scores from each letter
             score += self.frequencyWeight * self.wordFrequencies[word] # add score based on how common the word is
             self.wordScores[word] = score # save result in a Dict
+
+        self.wordScores = dict(sorted(self.wordScores.items(), key=lambda item: item[1], reverse=True)) # sort by value
 
         # find the best candidate, i.e. the key with the largest value associated with it
         self.bestWord = max(self.wordScores, key=self.wordScores.get)
@@ -241,6 +287,7 @@ class WordleBot:
         """
 
         newValidWords = []
+        self.previousValidWordsCount = len(self.validWords)
         for word in self.validWords:
             candidate = word.replace('\n', '').lower()  # get rid of newline token and convert to lowercase
 
@@ -250,3 +297,19 @@ class WordleBot:
                         newValidWords.append(candidate)
 
         self.validWords = newValidWords
+
+    def findWordsReductionPercentage(self):
+        """
+        Function to determine the percent reduction of the valid words space by the previous guess
+        """
+        return 100 * (1 - len(self.validWords) / self.previousValidWordsCount)
+
+    def findBitsOfInformation(self):
+        """
+        Helper function to calculate the number of bits of information gained by a guess.
+        Information is calculated as: H = -log2(p(x))
+        """
+        return -math.log2(len(self.validWords) / self.previousValidWordsCount)
+
+
+

@@ -16,14 +16,14 @@ def main():
     for i, word in enumerate(all_words):
 
         #if i == 200:
-        #    break
+        #   break
 
         word = word.replace('\n', '').lower()  # get rid of newline token and convert to lowercase
 
         if i % 100 == 0:
             print("Playing game " + str(i) + "...")
 
-        wordleBot = WordleBot(selfPlay=True)
+        wordleBot = WordleBot(selfPlay=True, randomGuesses=False)
         wordleBot.SetSolution(word)
         wordleBot.play()
         numGuesses.append(wordleBot.numGuesses)
